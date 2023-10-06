@@ -39,7 +39,7 @@ export class Options {
     openaiTimeoutMS = '120000',
     openaiConcurrencyLimit = '6',
     githubConcurrencyLimit = '6',
-    apiBaseUrl = 'https://api.openai.com/v1',
+    apiBaseUrl = 'https://<resource name>.openai.azure.com/',
     language = 'en-US'
   ) {
     this.debug = debug

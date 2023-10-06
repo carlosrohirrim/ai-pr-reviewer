@@ -5,6 +5,8 @@ import * as process from 'process'
 
 test('test runs', () => {
   process.env['INPUT_ACTION'] = 'code-review'
+  process.env['NODE_OPTIONS'] = '--experimental-specifier-resolution=node'
+  process.env['GITHUB_ACTION'] = 'ai-pr-reviewer'
   const np = process.execPath
   const ip = path.join(__dirname, '..', 'lib', 'main.js')
   const options: cp.ExecFileSyncOptions = {

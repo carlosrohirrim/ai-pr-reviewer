@@ -123,3 +123,9 @@ tags.lock
 .env
 .secrets
 bin/act
+
+# Local build output
+build/*
+
+#local files
+settings.json
