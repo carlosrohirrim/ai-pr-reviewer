@@ -1,15 +1,15 @@
 import './fetch-polyfill'
 
 import {info, setFailed, warning} from '@actions/core'
-import {
-  ChatGPTAPI,
-  ChatGPTError,
-  ChatMessage,
-  SendMessageOptions
-  // eslint-disable-next-line import/no-unresolved
-} from 'chatgpt'
+
 import pRetry from 'p-retry'
 import {OpenAIOptions, Options} from './options'
+import {
+  AzureKeyCredential,
+  ChatCompletions,
+  GetChatCompletionsOptions,
+  OpenAIClient
+} from '@azure/openai'
 
 // define type to save parentMessageId and conversationId
 export interface Ids {
@@ -18,34 +18,33 @@ export interface Ids {
 }
 
 export class Bot {
-  private readonly api: ChatGPTAPI | null = null // not free
+  private readonly api: OpenAIClient | null = null // not free
 
   private readonly options: Options
+  private readonly openaiOptions: OpenAIOptions
 
   constructor(options: Options, openaiOptions: OpenAIOptions) {
     this.options = options
+    this.openaiOptions = openaiOptions
     if (process.env.OPENAI_API_KEY) {
-      const currentDate = new Date().toISOString().split('T')[0]
-      const systemMessage = `${options.systemMessage} 
-Knowledge cutoff: ${openaiOptions.tokenLimits.knowledgeCutOff}
-Current date: ${currentDate}
-
-IMPORTANT: Entire response must be in the language with ISO code: ${options.language}
-`
-
-      this.api = new ChatGPTAPI({
-        apiBaseUrl: options.apiBaseUrl,
-        systemMessage,
-        apiKey: process.env.OPENAI_API_KEY,
-        apiOrg: process.env.OPENAI_API_ORG ?? undefined,
-        debug: options.debug,
-        maxModelTokens: openaiOptions.tokenLimits.maxTokens,
-        maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
-        completionParams: {
-          temperature: options.openaiModelTemperature,
-          model: openaiOptions.model
-        }
-      })
+      info(`OPENAI_API_KEY: ${process.env.OPENAI_API_KEY}`)
+      info(`options.apiBaseUrl: ${options.apiBaseUrl}`)
+      info(`process.env.OPENAI_BASE_URL: ${process.env.OPENAI_BASE_URL}`)
+      this.api = new OpenAIClient(
+        process.env.OPENAI_BASE_URL ?? 'https://api.openai.com',
+        new AzureKeyCredential(process.env.OPENAI_API_KEY)
+        // apiBaseUrl: options.apiBaseUrl,
+        // systemMessage,
+        // apiKey: process.env.OPENAI_API_KEY,
+        // apiOrg: process.env.OPENAI_API_ORG ?? undefined,
+        // debug: options.debug,
+        // maxModelTokens: openaiOptions.tokenLimits.maxTokens,
+        // maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
+        // completionParams: {
+        //   temperature: options.openaiModelTemperature,
+        //   model: openaiOptions.model
+        // }
+      )
     } else {
       const err =
         "Unable to initialize the OpenAI API, both 'OPENAI_API_KEY' environment variable are not available"
@@ -58,9 +57,9 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
     try {
       res = await this.chat_(message, ids)
       return res
-    } catch (e: unknown) {
-      if (e instanceof ChatGPTError) {
-        warning(`Failed to chat: ${e}, backtrace: ${e.stack}`)
+    } catch (e) {
+      if (e) {
+        warning(`Failed to chat: ${e}`)
       }
       return res
     }
@@ -76,21 +75,28 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       return ['', {}]
     }
 
-    let response: ChatMessage | undefined
+    const messages = [
+      {role: 'system', content: this.options.systemMessage},
+      {role: 'user', content: message}
+    ]
+    let response: AsyncIterable<ChatCompletions> | undefined
 
     if (this.api != null) {
-      const opts: SendMessageOptions = {
-        timeoutMs: this.options.openaiTimeoutMS
-      }
-      if (ids.parentMessageId) {
-        opts.parentMessageId = ids.parentMessageId
+      const opts: GetChatCompletionsOptions = {
+        maxTokens: this.openaiOptions.tokenLimits.maxTokens,
+        temperature: this.options.openaiModelTemperature,
+        model: 'gpt-35-turbo-16k'
       }
       try {
-        response = await pRetry(() => this.api!.sendMessage(message, opts), {
-          retries: this.options.openaiRetries
-        })
-      } catch (e: unknown) {
-        if (e instanceof ChatGPTError) {
+        response = await pRetry(
+          () =>
+            this.api!.listChatCompletions(opts.model as string, messages, opts),
+          {
+            retries: this.options.openaiRetries
+          }
+        )
+      } catch (e: any) {
+        if (e instanceof Error) {
           info(
             `response: ${response}, failed to send message to openai: ${e}, backtrace: ${e.stack}`
           )
@@ -107,8 +113,17 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       setFailed('The OpenAI API is not initialized')
     }
     let responseText = ''
+    let parentMessageId = ''
+    let conversationId = ''
     if (response != null) {
-      responseText = response.text
+      for await (const item of response) {
+        for (const choice of item.choices) {
+          conversationId = choice.index.toString()
+          responseText += choice.message
+        }
+        parentMessageId = item.id
+      }
+      info(`responseText: ${responseText}`)
     } else {
       warning('openai response is null')
     }
@@ -120,8 +135,8 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       info(`openai responses: ${responseText}`)
     }
     const newIds: Ids = {
-      parentMessageId: response?.id,
-      conversationId: response?.conversationId
+      parentMessageId: parentMessageId,
+      conversationId: conversationId
     }
     return [responseText, newIds]
   }

@@ -142,7 +142,10 @@ export class OpenAIOptions {
   model: string
   tokenLimits: TokenLimits
 
-  constructor(model = 'gpt-3.5-turbo', tokenLimits: TokenLimits | null = null) {
+  constructor(
+    model = 'gpt-35-turbo-16k',
+    tokenLimits: TokenLimits | null = null
+  ) {
     this.model = model
     if (tokenLimits != null) {
       this.tokenLimits = tokenLimits

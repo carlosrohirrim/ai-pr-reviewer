@@ -125,7 +125,7 @@ tags.lock
 bin/act
 
 # Local build output
-build/*
+
 
 #local files
 settings.json
