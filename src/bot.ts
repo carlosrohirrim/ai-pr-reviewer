@@ -33,17 +33,6 @@ export class Bot {
       this.api = new OpenAIClient(
         process.env.OPENAI_BASE_URL ?? 'https://api.openai.com',
         new AzureKeyCredential(process.env.OPENAI_API_KEY)
-        // apiBaseUrl: options.apiBaseUrl,
-        // systemMessage,
-        // apiKey: process.env.OPENAI_API_KEY,
-        // apiOrg: process.env.OPENAI_API_ORG ?? undefined,
-        // debug: options.debug,
-        // maxModelTokens: openaiOptions.tokenLimits.maxTokens,
-        // maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
-        // completionParams: {
-        //   temperature: options.openaiModelTemperature,
-        //   model: openaiOptions.model
-        // }
       )
     } else {
       const err =
@@ -80,7 +69,7 @@ export class Bot {
       {role: 'user', content: message}
     ]
     let response: AsyncIterable<ChatCompletions> | undefined
-
+    info(`ids: ${JSON.stringify(ids)}`)
     if (this.api != null) {
       const opts: GetChatCompletionsOptions = {
         maxTokens: this.openaiOptions.tokenLimits.maxTokens,
@@ -135,8 +124,8 @@ export class Bot {
       info(`openai responses: ${responseText}`)
     }
     const newIds: Ids = {
-      parentMessageId: parentMessageId,
-      conversationId: conversationId
+      parentMessageId,
+      conversationId
     }
     return [responseText, newIds]
   }

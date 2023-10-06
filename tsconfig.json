@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
     "incremental": false,
-    "sourceMap": false,
+    "sourceMap": true,
     "allowJs": true,
     "checkJs": false,
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "target": "ESNext",
-    "module": "ESNext",
+    "target": "ES2022",
+    "module": "ES2022",
     "outDir": "./lib",
     "rootDir": "./src",
     "strict": true,
